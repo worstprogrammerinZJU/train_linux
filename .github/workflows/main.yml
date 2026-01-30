@@ -1,0 +1,53 @@
+name: Cross-Compile C to Assembly
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # 支持手动触发
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Directories
+      run: |
+        mkdir -p x86_asm
+        mkdir -p arm_asm
+
+    - name: Compile and Rename
+      run: |
+        # 进入源码目录
+        cd all_c_source
+        
+        # 获取所有 .c 文件并排序，确保序号一致
+        files=($(ls *.c | sort))
+        
+        for i in "${!files[@]}"; do
+          index=$((i + 1))
+          filename="${files[$i]}"
+          
+          echo "Processing [$index]: $filename"
+          
+          # 1. 编译为 x86_64 汇编
+          # -S 生成汇编, -masm=intel 使用intel格式(可选), -target 指定架构
+          clang -S -target x86_64-apple-macos11 "$filename" -o "../x86_asm/${index}_x86.s"
+          
+          # 2. 编译为 ARM64 汇编 (Apple Silicon 架构)
+          clang -S -target arm64-apple-macos11 "$filename" -o "../arm_asm/${index}_arm.s"
+        done
+
+    - name: Upload x86 Assembly
+      uses: actions/upload-artifact@v4
+      with:
+        name: x86-assembly-files
+        path: x86_asm/
+
+    - name: Upload ARM Assembly
+      uses: actions/upload-artifact@v4
+      with:
+        name: arm-assembly-files
+        path: arm_asm/
